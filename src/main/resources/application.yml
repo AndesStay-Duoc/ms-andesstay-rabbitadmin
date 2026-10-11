@@ -1,0 +1,72 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: ms-andesstay-rabbitadmin
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:}
+    password: ${RABBITMQ_PASS:}
+    virtual-host: ${RABBITMQ_VHOST:andesstay}
+
+  jackson:
+    deserialization:
+      # Un campo mal escrito ("ttlMensajes" en vez de "ttlMensajesMs") se rechaza con 400 en lugar
+      # de ignorarse: si se ignorara, la cola se crearía sin el TTL que se pidió y nadie se
+      # enteraría. Spring Boot lo trae en false por omisión.
+      fail-on-unknown-properties: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Firma (JWKS), vigencia, issuer y audience del JWT de Azure AD
+          issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:055d11d1-8ae0-4221-a6f7-b50be0a623b4}/v2.0
+          jwk-set-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:055d11d1-8ae0-4221-a6f7-b50be0a623b4}/discovery/v2.0/keys
+          # Azure AD puede emitir aud como api://<clientId> o como el GUID del clientId
+          audiences:
+            - api://${AZURE_CLIENT_ID:704a544f-3d92-44f5-aef9-8559574cff34}
+            - ${AZURE_CLIENT_ID:704a544f-3d92-44f5-aef9-8559574cff34}
+
+andesstay:
+  rabbitadmin:
+    management:
+      # API HTTP de gestión de RabbitMQ (el plugin management, puerto 15672). Se usa solo para
+      # LEER: AMQP no permite listar colas, exchanges ni bindings, ni leer los argumentos de una
+      # cola. Las escrituras van por AMQP con AmqpAdmin. Usa el mismo usuario que spring.rabbitmq.
+      url: ${RABBITMQ_MANAGEMENT_URL:http://localhost:15672}
+      timeout-ms: ${RABBITMQ_MANAGEMENT_TIMEOUT_MS:5000}
+    protegidos:
+      # Topología de la que dependen reservations y notify: no se puede crear, modificar ni
+      # eliminar desde el administrador, ni siquiera con forzar=true. Tampoco se pueden crear ni
+      # eliminar bindings HACIA un recurso protegido, ni eliminar bindings DESDE un exchange
+      # protegido; sí se pueden crear bindings desde un exchange protegido hacia colas nuevas.
+      #
+      # Cada entrada es un nombre exacto o un PREFIJO terminado en '*', y ese '*' abarca cualquier
+      # sufijo, puntos incluidos: q.cmd.* cubre q.cmd.email y también q.cmd.email.dlq. No es el
+      # comodín de un binding topic, donde '*' es una sola palabra.
+      #
+      # Cubre los nombres que declara ms-andesstay-notify en su application.yml:
+      #   exchanges  cmd.direct, cmd.topic, cmd.dead.dlx
+      #   colas      q.cmd.email, q.cmd.housekeeping, q.cmd.voucher y sus tres .dlq
+      # Varias entradas se separan con comas en la variable de entorno.
+      colas: ${RABBITADMIN_COLAS_PROTEGIDAS:q.cmd.*}
+      exchanges: ${RABBITADMIN_EXCHANGES_PROTEGIDOS:cmd.*}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    rabbit:
+      # Si el administrador no alcanza el broker no sirve para nada: el contenedor debe quedar
+      # unhealthy.
+      enabled: true
+
+logging:
+  level:
+    cl.andesstay: DEBUG
