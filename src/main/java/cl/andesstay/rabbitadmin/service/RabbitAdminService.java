@@ -273,13 +273,13 @@ public class RabbitAdminService {
 
     private void rechazarColaProtegida(String nombre, String accion) {
         protegidos.patronDeCola(nombre).ifPresent(patron -> {
-            throw protegido(COLA, nombre, patron, "andesstay.rabbitadmin.protegidos.colas", accion + "la");
+            throw protegido(COLA, nombre, patron, "andesstay.rabbitadmin.protegidos.colas", accion);
         });
     }
 
     private void rechazarExchangeProtegido(String nombre, String accion) {
         protegidos.patronDeExchange(nombre).ifPresent(patron -> {
-            throw protegido(EXCHANGE, nombre, patron, "andesstay.rabbitadmin.protegidos.exchanges", accion + "lo");
+            throw protegido(EXCHANGE, nombre, patron, "andesstay.rabbitadmin.protegidos.exchanges", accion);
         });
     }
 
